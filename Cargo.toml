@@ -1,10 +1,10 @@
 [package]
-name = "SigmaOS-achievement"
+name = "sigmaos_achievement"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
-description = "SigmaOS component - part of multi-repository architecture"
+license = "MIT"
+description = "SigmaOS achievement component inspired by Linux Mint / Omarchy / Arch Linux."
 
 [lib]
-name = "achievement"
+name = "sigmaos_achievement"
 path = "src/lib.rs"
