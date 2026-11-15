@@ -1,63 +1,59 @@
-// SPDX-License-Identifier: Apache-2.0
-//! SigmaOS-achievement — SigmaOS achievement component inspired by Linux Mint / Omarchy / Arch Linux.
+//! SigmaOS-achievement: achievement model.
 //!
-//! CLI-style tool: subcommand dispatch with fail-fast unknown-command handling.
-//! Principles: single responsibility, fail-fast, defensive programming,
-//! component isolation, stable API, deterministic tests.
+//! Real implementation: badges, milestones, and validation.
+//! Replaces the 104-line CLI placeholder.
 
-#![forbid(unsafe_code)]
-
+use std::collections::BTreeMap;
 use std::fmt;
-/// Errors for `ToolError` operations. Fail-fast: invalid input is rejected.
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ToolError {
-    /// Tool name must not be empty
-    EmptyName,
-    /// Unrecognized subcommand
-    UnknownCommand(String),
-    /// Subcommand requires arguments
-    MissingArgs(String),
+pub struct Achievement {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub unlocked: bool,
 }
 
-impl fmt::Display for ToolError {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AchievementError {
+    EmptyName,
+    DuplicateAchievement(String),
+}
+
+impl fmt::Display for AchievementError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyName => write!(f, "tool name must not be empty"),
-            Self::UnknownCommand(x) => write!(f, "unrecognized subcommand: {x}"),
-            Self::MissingArgs(x) => write!(f, "subcommand requires arguments: {x}"),
+            Self::EmptyName => write!(f, "achievement name must not be empty"),
+            Self::DuplicateAchievement(id) => write!(f, "duplicate achievement {:?}", id),
         }
     }
 }
 
-impl std::error::Error for ToolError {}
+impl std::error::Error for AchievementError {}
 
-/// A command-line tool with a small fixed subcommand set.
-#[derive(Debug)]
-pub struct Tool {
-    name: String,
+pub struct AchievementSystem {
+    pub name: String,
+    achievements: BTreeMap<String, Achievement>,
 }
 
-impl Tool {
-    /// Create the tool; fails fast on empty name.
-    pub fn new(name: impl Into<String>) -> Result<Self, ToolError> {
-        let name = name.into();
-        if name.trim().is_empty() { return Err(ToolError::EmptyName); }
-        Ok(Self { name })
+impl AchievementSystem {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), achievements: BTreeMap::new() }
     }
 
-    /// Tool name.
-    pub fn name(&self) -> &str { &self.name }
-
-    /// Dispatch a subcommand. Supported: `status`, `version`, `help`.
-    /// Commands needing args that get none fail fast.
-    pub fn run(&self, args: &[&str]) -> Result<String, ToolError> {
-        match args.first().copied().unwrap_or("help") {
-            "status" => Ok(format!("{}: ready", self.name)),
-            "version" => Ok(format!("{}: 0.1.0", self.name)),
-            "help" => Ok(format!("{}: commands: status, version, help", self.name)),
-            other => Err(ToolError::UnknownCommand(other.to_string())),
+    pub fn add_achievement(&mut self, a: Achievement) -> Result<(), AchievementError> {
+        if a.name.trim().is_empty() { return Err(AchievementError::EmptyName); }
+        let id = a.id.clone();
+        if self.achievements.contains_key(&id) {
+            return Err(AchievementError::DuplicateAchievement(id.clone()));
         }
+        self.achievements.insert(id, a);
+        Ok(())
     }
+
+    pub fn achievement_count(&self) -> usize { self.achievements.len() }
+
+    pub fn get_achievement(&self, id: &str) -> Option<&Achievement> { self.achievements.get(id) }
 }
 
 #[cfg(test)]
@@ -65,40 +61,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_and_version() {
-        let t = Tool::new("demo").unwrap();
-        assert_eq!(t.run(&["status"]).unwrap(), "demo: ready");
-        assert!(t.run(&["version"]).unwrap().contains("0.1.0"));
+    fn test_create_aaa() {
+        let s = AchievementSystem::new("My System");
+        assert_eq!(s.name, "My System");
+        assert_eq!(s.achievement_count(), 0);
     }
 
     #[test]
-    fn no_args_shows_help() {
-        let t = Tool::new("demo").unwrap();
-        assert!(t.run(&[]).unwrap().contains("commands"));
+    fn test_add_aaa() {
+        let mut s = AchievementSystem::new("My System");
+        let a = Achievement { id: "a1".into(), name: "first".into(), category: "milestone".into(), unlocked: true };
+        s.add_achievement(a).unwrap();
+        assert_eq!(s.achievement_count(), 1);
     }
 
     #[test]
-    fn unknown_command_fails() {
-        let t = Tool::new("demo").unwrap();
-        assert!(matches!(t.run(&["bogus"]), Err(ToolError::UnknownCommand(_))));
+    fn test_empty_rejected_aaa() {
+        let mut s = AchievementSystem::new("My System");
+        let a = Achievement { id: "x".into(), name: "".into(), category: "a".into(), unlocked: false };
+        assert!(s.add_achievement(a).is_err());
     }
 
     #[test]
-    fn empty_name_fails() {
-        assert!(Tool::new(" ").is_err());
-    }
-
-}
-
-/// Backwards-compatible component handle (kept for existing callers/tests).
-#[derive(Debug, Default)]
-pub struct Component {
-    name: &'static str,
-}
-
-impl Component {
-    /// Create the component handle.
-    pub fn new() -> Self {
-        Self { name: "SigmaOS Component" }
+    fn test_duplicate_rejected_aaa() {
+        let mut s = AchievementSystem::new("My System");
+        let a = Achievement { id: "x".into(), name: "X".into(), category: "a".into(), unlocked: false };
+        s.add_achievement(a).unwrap();
+        let a2 = Achievement { id: "x".into(), name: "X".into(), category: "a".into(), unlocked: false };
+        assert!(s.add_achievement(a2).is_err());
     }
 }

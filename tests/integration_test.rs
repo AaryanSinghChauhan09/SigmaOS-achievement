@@ -1,6 +1,6 @@
-use sigmaos_achievement::Component;
+use sigmaos_achievement::AchievementSystem;
 
 #[test]
 fn component_constructs() {
-    let _c = Component::new();
+    let _c = AchievementSystem::new("Test Achievement");
 }
